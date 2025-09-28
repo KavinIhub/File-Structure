@@ -1,0 +1,16 @@
+[project]
+name = "hospital"
+version = "0.1.0"
+description = "Hospital Management System with Authentication"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.117.1",
+    "ruff>=0.13.2",
+    "uvicorn>=0.37.0",
+    "pymongo>=4.6.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.6",
+    "pydantic[email]>=2.0.0",
+]
