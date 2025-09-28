@@ -42,51 +42,84 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 @router.post("/register", response_model=MessageResponse)
 async def register_user(user: UserCreate):
     """Register a new user"""
-    db = get_database()
-    
-    # Check if user already exists
-    existing_user = db.users.find_one({
-        "$or": [
-            {"username": user.username},
-            {"email": user.email}
-        ]
-    })
-    
-    if existing_user:
-        if existing_user.get("username") == user.username:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered"
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
-    
-    # Hash password and create user
-    hashed_password = get_password_hash(user.password)
-    
-    from datetime import datetime
-    user_doc = {
-        "username": user.username,
-        "email": user.email,
-        "full_name": user.full_name,
-        "hashed_password": hashed_password,
-        "is_active": True,
-        "created_at": datetime.utcnow()
-    }
-    
     try:
-        result = db.users.insert_one(user_doc)
-        return MessageResponse(
-            message=f"User {user.username} registered successfully",
-            success=True
-        )
+        db = get_database()
+        
+        if db is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database connection not available"
+            )
+        
+        # Check if user already exists
+        try:
+            existing_user = db.users.find_one({
+                "$or": [
+                    {"username": user.username},
+                    {"email": user.email}
+                ]
+            })
+            
+            if existing_user:
+                if existing_user.get("username") == user.username:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Username already registered"
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Email already registered"
+                    )
+        except Exception as db_error:
+            print(f"Database query error: {db_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database query failed"
+            )
+        
+        # Hash password and create user
+        try:
+            hashed_password = get_password_hash(user.password)
+        except Exception as hash_error:
+            print(f"Password hashing error: {hash_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Password processing failed"
+            )
+        
+        from datetime import datetime
+        user_doc = {
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "hashed_password": hashed_password,
+            "is_active": True,
+            "created_at": datetime.utcnow()
+        }
+        
+        try:
+            result = db.users.insert_one(user_doc)
+            print(f"User created with ID: {result.inserted_id}")
+            return MessageResponse(
+                message=f"User {user.username} registered successfully",
+                success=True
+            )
+        except Exception as insert_error:
+            print(f"Database insert error: {insert_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create user: {str(insert_error)}"
+            )
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        print(f"Unexpected error in register_user: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user"
+            detail=f"Internal server error: {str(e)}"
         )
 
 @router.post("/login", response_model=LoginResponse)
